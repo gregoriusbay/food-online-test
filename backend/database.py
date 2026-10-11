@@ -5,6 +5,7 @@ Connection from .env: DB_HOST, DB_PORT, DB_USERNAME, DB_PASSWORD, DB_NAME
 from __future__ import annotations
 
 import datetime
+import json
 import os
 from typing import Any
 from uuid import UUID
@@ -172,3 +173,33 @@ def get_receipt(receipt_id: str) -> dict | None:
                     (receipt_id,))
         receipt["items"] = cur.fetchall()
         return receipt
+
+
+def list_items(start_date: str | None = None, end_date: str | None = None,
+               restaurant: str | None = None, limit: int = 50) -> list[dict]:
+    """Purchased food items with their restaurant and date, newest first."""
+    where, params = _filters(start_date, end_date, restaurant)
+    return _fetchall(
+        f"""SELECT i.food_name, i.line_total, r.restaurant, r.purchased_at, r.purchased_time
+            FROM receipt_items i JOIN receipts r ON r.id = i.receipt_id
+            {where}
+            ORDER BY r.purchased_at DESC NULLS LAST, r.purchased_time DESC NULLS LAST
+            LIMIT %s""",
+        params + [max(1, min(int(limit), 200))])
+
+
+# --------------------------------------------------------------- vector candidates
+def fetch_item_vectors(start_date: str | None = None, end_date: str | None = None) -> list[dict]:
+    """Items that have an embedding, with their vector as list[float].
+    pgvector only STORES the vectors; the similarity itself is computed in similarity.py.
+    psycopg returns the vector column as text '[0.1,0.2,...]', hence json.loads."""
+    where, params = _filters(start_date, end_date, None)
+    where = f"{where} AND i.embedding IS NOT NULL" if where else "WHERE i.embedding IS NOT NULL"
+    rows = _fetchall(
+        f"""SELECT i.food_name, i.line_total, r.restaurant, r.purchased_at, r.purchased_time,
+                   i.embedding::text AS embedding
+            FROM receipt_items i JOIN receipts r ON r.id = i.receipt_id
+            {where}""", params)
+    for row in rows:
+        row["embedding"] = json.loads(row["embedding"])
+    return rows

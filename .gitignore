@@ -2,3 +2,6 @@
 __pycache__/
 .ruff_cache/
 backend/uploads/
+frontend/node_modules/
+frontend/dist/
+data/*.csv

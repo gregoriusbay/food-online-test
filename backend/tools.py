@@ -13,6 +13,7 @@ import ollama
 
 import database
 import llm
+import similarity
 
 AGENT_MODEL = llm.MODEL          # qwen3-vl:8b-instruct supports tool calling
 AGENT_N_CTX = 8192
@@ -24,6 +25,8 @@ Rules:
 - Dates use the format YYYY-MM-DD. For relative periods, COPY these ranges (do not compute them yourself):
 {date_ranges}
 - A date without a year (e.g. "20 June") means the most recent such date up to today.
+- Picking a tool: "what did I buy/eat" -> list_items; a specific food or kind of food
+  ("hamburger", "coffee") -> search_items; totals/expenses -> spending_summary.
 - Never invent numbers. Every number in the answer must come from a tool result.
 - search_items searches by meaning and always returns something; ignore results with a
   low score or that are clearly unrelated to the question.
@@ -34,9 +37,16 @@ Rules:
 
 # --------------------------------------------------------------- vector search tool
 def search_items(text: str, start_date: str | None = None, end_date: str | None = None,
-                 limit: int = 10) -> list[dict]:
-    # [YOU] steps 6-7: embed query -> database.fetch_item_vectors -> similarity.top_k
-    raise NotImplementedError("search_items is not implemented yet (steps 6-7)")
+                 limit: int = 5) -> list[dict]:
+    """Semantic item search: embed the query, load candidate vectors from pgvector (storage
+    only), rank them with our own cosine similarity (similarity.py)."""
+    query_vec = llm.embed_texts([text], kind="query")[0]
+    rows = database.fetch_item_vectors(start_date, end_date)
+    if not rows:
+        return []
+    idx, scores = similarity.top_k(query_vec, [r["embedding"] for r in rows], k=int(limit))
+    return [{**{k: v for k, v in rows[i].items() if k != "embedding"}, "score": round(float(s), 3)}
+            for i, s in zip(idx, scores)]
 
 
 # --------------------------------------------------------------- tool definitions
@@ -58,6 +68,16 @@ TOOLS: list[dict] = [
         "parameters": {"type": "object", "properties": {
             "start_date": _DATE, "end_date": _DATE,
             "limit": {"type": "integer", "description": "Number of restaurants (default 10)."},
+        }},
+    }},
+    {"type": "function", "function": {
+        "name": "list_items",
+        "description": "List the food/drink items bought in a period, with restaurant, date and price. "
+                       "Use this for questions like 'what did I eat/buy yesterday'.",
+        "parameters": {"type": "object", "properties": {
+            "start_date": _DATE, "end_date": _DATE,
+            "restaurant": {"type": "string", "description": "Part of the restaurant name."},
+            "limit": {"type": "integer", "description": "Max number of items (default 50)."},
         }},
     }},
     {"type": "function", "function": {
@@ -92,6 +112,7 @@ TOOLS: list[dict] = [
 TOOL_FUNCS: dict[str, Callable[..., Any]] = {
     "spending_summary": database.spending_summary,
     "spending_by_restaurant": database.spending_by_restaurant,
+    "list_items": database.list_items,
     "search_items": search_items,
     "list_receipts": database.list_receipts,
     "get_receipt": database.get_receipt,
