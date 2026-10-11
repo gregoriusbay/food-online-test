@@ -1,0 +1,41 @@
+# ==============================================================================
+# Docker Ignore - ISO 27001:2022 Compliant (Control 8.28)
+# Principle of Least Privilege: Exclude everything, allow only required app files.
+# ==============================================================================
+
+# 1. Block everything by default to minimize attack surface and context size
+*
+
+# 2. Allow core application modules and runtime files
+!api/
+!infrastructure/
+!model/
+!services/
+!utils/
+!main.py
+!requirements.txt
+
+# 3. Security Hardening: Exclude sensitive and development-only artifacts (Control 8.8)
+**/.git
+**/.gitignore
+**/.dockerignore
+**/Dockerfile
+**/.gitlab-ci.yml
+**/.env*
+**/.venv
+**/venv
+**/.agent/
+
+# 4. Performance Optimization: Exclude Python build artifacts and cache
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/.pytest_cache
+**/.coverage
+**/htmlcov
+
+# 5. Exclude non-runtime documentation and CI scripts
+**/ci/
+**/*.md
+**Running.txt

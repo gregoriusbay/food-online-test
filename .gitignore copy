@@ -1,0 +1,41 @@
+# Virtual environment
+venv/
+.env
+.env.example
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+
+# Logs
+*.log
+
+# IDE / Editor
+.vscode/
+.idea/
+
+# Docker
+*.tar
+
+# Test Folder Image
+image
+
+# Old & new folder
+v1/
+v2/
+v3/
+v4/
+
+# Firebase
+firebase-key.json
+google-services.json
