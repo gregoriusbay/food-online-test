@@ -3,7 +3,8 @@ export interface ReceiptItem {
   line_total: number | null;
 }
 
-/** Editable receipt fields. Dates are ISO "YYYY-MM-DD", times "HH:MM". */
+/** Editable receipt fields. In the UI dates are "YYYY-MM-DD" (for <input type="date">);
+ *  on the wire they are "DD/MM/YYYY" (see toApiInput). Times are "HH:MM". */
 export interface ReceiptFields {
   restaurant: string | null;
   purchased_at: string | null;
@@ -15,7 +16,7 @@ export interface ReceiptFields {
   total_price: number | null;
 }
 
-/** Body of PATCH /receipts/:id. */
+/** Body of PATCH /receipts/:id (after toApiInput). */
 export interface ReceiptInput extends ReceiptFields {
   items: ReceiptItem[];
 }

@@ -1,5 +1,5 @@
 import type { AskResponse, Receipt, ReceiptInput, UploadResponse } from "./types";
-import { isObj, normalizeReceipt } from "./lib/normalize";
+import { isObj, normalizeReceipt, toApiInput } from "./lib/normalize";
 
 // Same-origin prefix: nginx (prod) and the Vite proxy (dev) strip it before
 // forwarding to Flask, so /api/receipts reaches the route /receipts.
@@ -61,11 +61,11 @@ export const api = {
     return normalizeReceipt(await request<unknown>(`/receipts/${encodeURIComponent(id)}`));
   },
 
-  /** PATCH /receipts/:id. Returns the saved receipt, or null if the body is empty. */
+  /** PATCH /receipts/:id (dates sent as "DD/MM/YYYY"). Returns the saved receipt, or null if the body is empty. */
   async updateReceipt(id: string, input: ReceiptInput): Promise<Receipt | null> {
     const body = await request<unknown>(
       `/receipts/${encodeURIComponent(id)}`,
-      json("PATCH", input),
+      json("PATCH", toApiInput(input)),
     );
     return isObj(body) && (body.id || body.receipt_id) ? normalizeReceipt(body) : null;
   },
@@ -84,8 +84,13 @@ export const api = {
 };
 
 export function errorMessage(e: unknown): string {
-  if (e instanceof ApiError && (e.status === 404 || e.status === 405)) {
-    return `${e.message}: this endpoint is not available in the backend yet.`;
+  if (e instanceof ApiError) {
+    // A 404/405 without a JSON `error` means Flask has no such route at all.
+    const hasError = isObj(e.body) && typeof e.body.error === "string";
+    if (!hasError && (e.status === 404 || e.status === 405)) {
+      return `${e.message}: this endpoint is not available in the backend yet.`;
+    }
+    return e.message;
   }
   return e instanceof Error ? e.message : String(e);
 }

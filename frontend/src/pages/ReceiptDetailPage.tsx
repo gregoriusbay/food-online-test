@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { api, errorMessage } from "../api";
 import { formatDate, formatMoney } from "../lib/format";
-import { receiptFromUpload } from "../lib/normalize";
+import { receiptFromUpload, toApiInput } from "../lib/normalize";
 import type { Receipt, ReceiptFields, ReceiptInput, UploadResponse } from "../types";
 import ImageViewer from "../components/ImageViewer";
 
@@ -412,7 +412,7 @@ function JsonTab({ receipt, draft, id }: { receipt: Receipt; draft: ReceiptInput
   const [view, setView] = useState<"result" | "raw">("result");
   const [copied, setCopied] = useState(false);
 
-  const result = { receipt_id: id, ...draft, warnings: receipt.warnings, meta: receipt.meta };
+  const result = { receipt_id: id, ...toApiInput(draft), warnings: receipt.warnings, meta: receipt.meta };
   const value = view === "result" ? result : receipt.raw_output;
   const text = value == null ? "" : JSON.stringify(value, null, 2);
 

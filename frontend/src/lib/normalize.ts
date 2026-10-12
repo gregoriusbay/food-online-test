@@ -1,8 +1,8 @@
-import type { RawOutput, Receipt, ReceiptItem, UploadResponse } from "../types";
+import type { RawOutput, Receipt, ReceiptInput, ReceiptItem, UploadResponse } from "../types";
 
-// Flask serialises Postgres values loosely: numeric -> "45000.00", date -> an
-// RFC 822 string, and /upload returns "DD/MM/YYYY". Everything is normalised
-// here so the rest of the UI only sees numbers, "YYYY-MM-DD" and "HH:MM".
+// The API uses "DD/MM/YYYY" dates; Flask may also send numeric as "45000.00".
+// Inside the UI everything is normalised to numbers, "YYYY-MM-DD" (what
+// <input type="date"> needs) and "HH:MM"; toApiInput converts back on the way out.
 
 type Json = Record<string, unknown>;
 
@@ -27,6 +27,18 @@ export function toIsoDate(v: unknown): string | null {
   const d = new Date(v);
   return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
 }
+
+/** "YYYY-MM-DD" (what <input type="date"> uses) -> "DD/MM/YYYY" (the API format). */
+export function toApiDate(iso: string | null): string | null {
+  const m = iso ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso) : null;
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : null;
+}
+
+/** Receipt input as the backend expects it (dates "DD/MM/YYYY", like /upload returns). */
+export const toApiInput = (input: ReceiptInput): ReceiptInput => ({
+  ...input,
+  purchased_at: toApiDate(input.purchased_at),
+});
 
 export function toTime(v: unknown): string | null {
   if (typeof v !== "string") return null;
