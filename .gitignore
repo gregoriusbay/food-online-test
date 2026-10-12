@@ -5,3 +5,5 @@ backend/uploads/
 frontend/node_modules/
 frontend/dist/
 data/*.csv
+# videos are too big for GitHub (100 MB limit), they're linked from the README instead
+*.mp4

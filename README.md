@@ -1,11 +1,9 @@
-# food-online-test
-
 This repo has my answers for the **Technical AI Engineer Test**. The test is split into two parts:
 
 - **Engineering Knowledge**: 5 theory questions (REST API vs MCP, Docker for AI, finetuning an LLM, etc). The answers are in [knowledge-test/Technical AI Engineer Test.pdf](knowledge-test/Technical%20AI%20Engineer%20Test.pdf).
 - **Coding Test**: analysing a small and a large CSV, vector cosine similarity, and a platform to upload online food receipts and ask questions about them with an LLM.
 
-Video of the coding test: _(link coming soon)_
+Video of the coding test: [Google Drive](https://drive.google.com/file/d/17y7OmMa8lzAZMAddBD9Ig9BUJKlaE_c3/view?usp=sharing)
 
 ## Where each question is
 
@@ -27,7 +25,7 @@ Video of the coding test: _(link coming soon)_
 backend/
   api.py          # Flask API: /upload, /receipts, /receipts/<id>, /receipts/<id>/image, /ask
   llm.py          # extraction prompt + schema, Ollama calls (vision & embedding)
-  extract.py      # post-processing of the model output (dates, numbers, total check)
+  extract.py      # post-processing of the model output (dates, numbers, item names)
   database.py     # save/read receipts in Postgres, plus the queries used by the tools
   tools.py        # tool-calling agent behind /ask
   similarity.py   # cosine similarity + top-k, numpy only
@@ -83,9 +81,9 @@ cos(a, b) = (a · b) / (|a| * |b|)
 
 1. User uploads a receipt photo/PDF from the UI (`POST /upload`, max 10 MB, jpg/png/bmp/tif/pdf).
 2. The file is rendered to images (PyMuPDF) and sent to the `qwen3-vl:8b-instruct` vision model on Ollama, with a JSON schema so the output is structured: `restaurant`, `purchased_at`, `purchased_time`, `items[]` (`food_name`, `line_total`), `subtotal`, `tax`, `fee`, `discount`, `total_price`.
-3. [extract.py](backend/extract.py) cleans it up: date formats (including Indonesian month names), Rupiah amounts, and checks if the totals add up. Anything odd shows up in `warnings`.
-4. Food names get embedded, then everything is saved to Postgres (the raw model output is kept too, in `raw_output`).
-5. In the UI the result can be checked and corrected by hand (`PATCH /receipts/<id>`), embeddings are regenerated when item names change.
+3. [extract.py](backend/extract.py) cleans it up: date formats (including Indonesian month names), Rupiah amounts, "2x" removed from item names, and a leftover "total" row dropped from the items. It only reformats what's on the receipt, it doesn't add anything of its own.
+4. Food names get embedded, then everything is saved to Postgres (what the model read is kept as-is too, in `raw_output`).
+5. In the UI the result can be checked and corrected by hand (`PATCH /receipts/<id>`), embeddings are regenerated when item names change. The extraction runs in the background, so you can move to another page while it's working; the receipt shows up in the table when it's done.
 
 ### Asking questions (`POST /ask`)
 
@@ -121,12 +119,10 @@ On CPU, extracting one receipt can take a few minutes, that's why the gunicorn t
 
 ### Run with Docker
 
-Create a `.env` in the root (docker-compose reads it for the `db` service):
+Copy the example env in the root (docker-compose reads it for the `db` and `backend` services):
 
-```env
-DB_USERNAME=postgres
-DB_PASSWORD=secret
-DB_NAME=receipts
+```bash
+cp .env.example .env
 ```
 
 Then:
@@ -157,7 +153,9 @@ npm install
 npm run dev
 ```
 
-For the backend, the root `.env` also needs `DB_HOST=localhost` and `DB_PORT=5433` (or just `DATABASE_URL=postgresql://postgres:secret@localhost:5433/receipts`).
+The backend reads the same root `.env` (`DB_HOST=localhost`, `DB_PORT=5433`, `DB_NAME=postgres`). Instead of the separate `DB_*` values you can also set one `DATABASE_URL=postgresql://postgres:secret@localhost:5433/postgres`.
+
+Don't mix the two ways of running when you upload receipts: the backend stores the image path, so a receipt uploaded with `python api.py` (path on your disk) has no image in the Docker version, and the other way around.
 
 Try it with curl:
 
@@ -180,7 +178,6 @@ Using GitLab CI ([.gitlab-ci.yml](.gitlab-ci.yml)):
 
 ## Notes / limitations
 
-- The root `.env.example` is still the old version (Gemini/OpenAI), the code now uses Ollama. Use the `.env` example above instead.
 - The local 8B model still misreads blurry receipts or unusual layouts sometimes, that's why there's a manual correction page.
 - No login yet, all receipts belong to one user.
 - `search_items` always returns something even when nothing is really similar (it's a ranking), so the LLM is told to ignore low scores. There's no fixed threshold yet.
