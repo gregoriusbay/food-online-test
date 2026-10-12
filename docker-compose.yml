@@ -8,10 +8,12 @@
 services:
   db:
     image: pgvector/pgvector:pg16          # self-hosted vector DB (Postgres + pgvector)
+    ports:
+      - "5433:5432"
     environment:
-      POSTGRES_USER: postgres
+      POSTGRES_USER: ${DB_USERNAME}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-secret}
-      POSTGRES_DB: receipts
+      POSTGRES_DB: ${DB_NAME}
     volumes:
       - db-data:/var/lib/postgresql/data
       - ./data/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro   # runs on first start only
@@ -39,7 +41,11 @@ services:
         condition: service_healthy
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      dockerfile: .docker/Dockerfile
+    environment:
+      BACKEND_API_URL: http://backend:5000   # used by nginx's /api/ proxy
     ports:
       - "8080:80"
     depends_on:
