@@ -1,16 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Loader2, MessagesSquare, Send, Trash2, Wrench } from "lucide-react";
-import { api, errorMessage } from "../api";
+import { clearConversation, sendQuestion, useAskStore } from "../lib/askStore";
 import type { ToolCall } from "../types";
-
-interface Message {
-  role: "user" | "assistant";
-  text: string;
-  toolCalls?: ToolCall[];
-  error?: boolean;
-}
-
-const STORAGE_KEY = "ask-history";
 
 const SUGGESTIONS = [
   "How much did I spend on food last month?",
@@ -19,44 +10,19 @@ const SUGGESTIONS = [
   "Berapa total diskon yang saya dapat tahun ini?",
 ];
 
-function loadHistory(): Message[] {
-  try {
-    const saved = sessionStorage.getItem(STORAGE_KEY);
-    return saved ? (JSON.parse(saved) as Message[]) : [];
-  } catch {
-    return [];
-  }
-}
-
 export default function AskPage() {
-  const [messages, setMessages] = useState<Message[]>(loadHistory);
+  const { messages, busy } = useAskStore();
   const [input, setInput] = useState("");
-  const [busy, setBusy] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    try {
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
-    } catch {
-      /* storage unavailable: history just won't survive a reload */
-    }
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, busy]);
 
-  async function send(question: string) {
-    const q = question.trim();
-    if (!q || busy) return;
+  function send(question: string) {
+    if (!question.trim() || busy) return;
     setInput("");
-    setMessages((m) => [...m, { role: "user", text: q }]);
-    setBusy(true);
-    try {
-      const res = await api.ask(q);
-      setMessages((m) => [...m, { role: "assistant", text: res.answer, toolCalls: res.tool_calls }]);
-    } catch (e) {
-      setMessages((m) => [...m, { role: "assistant", text: errorMessage(e), error: true }]);
-    } finally {
-      setBusy(false);
-    }
+    void sendQuestion(question);
   }
 
   return (
@@ -67,7 +33,7 @@ export default function AskPage() {
           <p className="text-sm text-slate-500">Ask questions about your receipts in plain language.</p>
         </div>
         {messages.length > 0 && (
-          <button className="btn-secondary px-3" onClick={() => setMessages([])} disabled={busy}>
+          <button className="btn-secondary px-3" onClick={clearConversation} disabled={busy}>
             <Trash2 size={16} /> Clear
           </button>
         )}

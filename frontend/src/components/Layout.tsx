@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
-import { Menu, MessagesSquare, ReceiptText, ScanLine, X } from "lucide-react";
+import { Loader2, Menu, MessagesSquare, ReceiptText, ScanLine, X } from "lucide-react";
+import { useAskStore } from "../lib/askStore";
 
 const NAV = [
   { to: "/receipts", label: "Extract", hint: "Receipts & review", icon: ScanLine },
@@ -12,6 +13,7 @@ export default function Layout() {
   // Remember which page the mobile drawer was opened on, so navigating closes it.
   const [openOn, setOpenOn] = useState<string | null>(null);
   const open = openOn === pathname;
+  const askBusy = useAskStore().busy;
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
@@ -56,6 +58,9 @@ export default function Layout() {
                 <span className="text-sm font-semibold">{label}</span>
                 <span className="text-xs text-slate-400">{hint}</span>
               </span>
+              {to === "/ask" && askBusy && (
+                <Loader2 size={16} className="ml-auto animate-spin text-brand-700" aria-label="Answer in progress" />
+              )}
             </NavLink>
           ))}
         </nav>

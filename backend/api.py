@@ -191,9 +191,16 @@ def ask():
         return jsonify(error="field 'question' is required (form or JSON)"), 400
 
     tool_calls: list[dict] = []
+
+    def log_round(t: dict) -> None:            # timings go to the terminal only, not the UI
+        app.logger.warning("/ask round %(round)s: load %(load_s)ss | read %(prompt_tokens)s tok "
+                           "in %(prompt_s)ss | wrote %(output_tokens)s tok in %(output_s)ss | "
+                           "tools %(tools_s)ss", t)
+
     try:
-        answer = tools.ask(question, on_tool=lambda name, args, _res: tool_calls.append(
-            {"tool": name, "args": args}))
+        answer = tools.ask(question,
+                           on_tool=lambda name, args, _res: tool_calls.append({"tool": name, "args": args}),
+                           on_round=log_round)
     except Exception as e:  # noqa: BLE001
         return jsonify(error=f"{type(e).__name__}: {e}", tool_calls=tool_calls), 500
     return jsonify(question=question, answer=answer, tool_calls=tool_calls)
