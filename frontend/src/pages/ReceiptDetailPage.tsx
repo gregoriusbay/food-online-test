@@ -13,7 +13,6 @@ import {
   Trash2,
 } from "lucide-react";
 import { api, errorMessage } from "../api";
-import { formatDate } from "../lib/format";
 import { receiptFromUpload, toApiInput } from "../lib/normalize";
 import type { Receipt, ReceiptFields, ReceiptInput, UploadResponse } from "../types";
 import ImageViewer from "../components/ImageViewer";
@@ -108,12 +107,8 @@ function ReceiptDetail({ id }: { id: string }) {
       .getReceipt(id)
       .then((r) => {
         if (cancelled) return;
-        // Keep warnings/meta from the upload response when GET doesn't return them.
-        setReceipt((prev) => ({
-          ...r,
-          warnings: r.warnings.length ? r.warnings : (prev?.warnings ?? []),
-          meta: r.meta ?? prev?.meta ?? null,
-        }));
+        // Keep meta from the upload response when GET doesn't return it.
+        setReceipt((prev) => ({ ...r, meta: r.meta ?? prev?.meta ?? null }));
         setForm((prev) => (prev && touched.current ? prev : toForm(r)));
       })
       .catch((e) => !cancelled && setLoadError(e))
@@ -150,7 +145,7 @@ function ReceiptDetail({ id }: { id: string }) {
     try {
       const saved = await api.updateReceipt(id, draft);
       const next: Receipt = saved
-        ? { ...receipt, ...saved, warnings: receipt.warnings, meta: saved.meta ?? receipt.meta, raw_output: saved.raw_output ?? receipt.raw_output }
+        ? { ...receipt, ...saved, meta: saved.meta ?? receipt.meta, raw_output: saved.raw_output ?? receipt.raw_output }
         : { ...receipt, ...draft, item_count: draft.items.length };
       setReceipt(next);
       setForm(toForm(next));
@@ -194,10 +189,6 @@ function ReceiptDetail({ id }: { id: string }) {
         <div className="min-w-0">
           <BackLink />
           <h1 className="mt-2 truncate text-2xl font-bold">{receipt.restaurant ?? "Untitled receipt"}</h1>
-          <p className="text-sm text-slate-500">
-            {formatDate(receipt.purchased_at)}
-            {receipt.purchased_time && ` · ${receipt.purchased_time}`} · ID {id.slice(0, 8)}
-          </p>
         </div>
         <div className="flex items-center gap-2">
           {notice && (
@@ -214,12 +205,6 @@ function ReceiptDetail({ id }: { id: string }) {
           </button>
         </div>
       </div>
-
-      {loadError != null && (
-        <p className="rounded-lg bg-amber-50 px-4 py-2 text-sm text-amber-800">
-          Showing the result returned by the upload. Could not load the saved version: {errorMessage(loadError)}
-        </p>
-      )}
 
       <div className="grid gap-4 lg:h-[calc(100vh-12rem)] lg:grid-cols-2">
         <section className="card flex min-h-[420px] flex-col overflow-hidden">
@@ -243,7 +228,7 @@ function ReceiptDetail({ id }: { id: string }) {
 
           <div className="flex-1 overflow-y-auto p-5">
             {tab === "fields" ? (
-              <FieldsForm form={form} draft={draft} warnings={receipt.warnings} edit={edit} editItem={editItem} />
+              <FieldsForm form={form} draft={draft} edit={edit} editItem={editItem} />
             ) : (
               <JsonTab receipt={receipt} draft={draft} id={id} />
             )}
@@ -265,27 +250,13 @@ function BackLink() {
 interface FieldsFormProps {
   form: FormState;
   draft: ReceiptInput;
-  warnings: string[];
   edit: (patch: Partial<FormState>) => void;
   editItem: (i: number, patch: Partial<FormState["items"][number]>) => void;
 }
 
-function FieldsForm({ form, draft, warnings, edit, editItem }: FieldsFormProps) {
+function FieldsForm({ form, draft, edit, editItem }: FieldsFormProps) {
   return (
     <div className="space-y-6">
-      {warnings.length > 0 && (
-        <div className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          <p className="mb-1 flex items-center gap-1 font-medium">
-            <AlertTriangle size={16} /> Extraction warnings
-          </p>
-          <ul className="list-disc space-y-0.5 pl-5">
-            {warnings.map((w) => (
-              <li key={w}>{w}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
       <div className="grid grid-cols-2 gap-4">
         <div className="col-span-2">
           <label className="label" htmlFor="restaurant">Restaurant</label>
@@ -375,7 +346,7 @@ function JsonTab({ receipt, draft, id }: { receipt: Receipt; draft: ReceiptInput
   const [view, setView] = useState<"result" | "raw">("result");
   const [copied, setCopied] = useState(false);
 
-  const result = { receipt_id: id, ...toApiInput(draft), warnings: receipt.warnings, meta: receipt.meta };
+  const result = { receipt_id: id, ...toApiInput(draft), meta: receipt.meta };
   const value = view === "result" ? result : receipt.raw_output;
   const text = value == null ? "" : JSON.stringify(value, null, 2);
 

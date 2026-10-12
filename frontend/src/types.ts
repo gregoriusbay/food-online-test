@@ -35,7 +35,6 @@ export interface Receipt extends ReceiptInput {
   item_count: number | null;
   created_at: string | null;
   image_path: string | null;
-  warnings: string[];
   meta: Record<string, unknown> | null;
   raw_output: RawOutput | null;
 }

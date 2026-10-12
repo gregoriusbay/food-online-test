@@ -59,7 +59,6 @@ function toItems(v: unknown): ReceiptItem[] {
 export function normalizeReceipt(v: unknown): Receipt {
   const o = isObj(v) ? v : {};
   const raw = isObj(o.raw_output) ? (o.raw_output as RawOutput) : null;
-  const warnings = Array.isArray(o.warnings) ? o.warnings : raw?.warnings;
   const meta = isObj(o.meta) ? o.meta : raw && isObj(raw.meta) ? raw.meta : null;
   return {
     id: String(o.id ?? o.receipt_id ?? ""),
@@ -75,7 +74,6 @@ export function normalizeReceipt(v: unknown): Receipt {
     item_count: toNum(o.item_count) ?? (Array.isArray(o.items) ? o.items.length : null),
     created_at: toStr(o.created_at),
     image_path: toStr(o.image_path),
-    warnings: Array.isArray(warnings) ? warnings.map(String) : [],
     meta,
     raw_output: raw,
   };
@@ -85,7 +83,6 @@ export function receiptFromUpload(res: UploadResponse): Receipt {
   return normalizeReceipt({
     ...res.data,
     id: res.receipt_id,
-    warnings: res.warnings,
     meta: res.meta,
   });
 }
