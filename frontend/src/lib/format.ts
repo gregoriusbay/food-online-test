@@ -1,5 +1,3 @@
-import type { Receipt } from "../types";
-
 const idr = new Intl.NumberFormat("id-ID", {
   style: "currency",
   currency: "IDR",
@@ -19,7 +17,3 @@ export function formatDate(iso: string | null): string {
     year: "numeric",
   });
 }
-
-/** Mirrors the schema: a NULL date/total means the extraction needs a human look. */
-export const needsReview = (r: Receipt): boolean =>
-  !r.restaurant || !r.purchased_at || r.total_price == null;

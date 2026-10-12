@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AlertTriangle, ChevronRight, Loader2, Plus, RefreshCw, ScanLine, Search } from "lucide-react";
 import { api, errorMessage } from "../api";
-import { formatDate, formatMoney, needsReview } from "../lib/format";
+import { formatDate, formatMoney } from "../lib/format";
 import { isExtracting, useExtractStore } from "../lib/extractStore";
 import type { Receipt } from "../types";
 import UploadModal from "../components/UploadModal";
@@ -46,7 +46,6 @@ export default function ReceiptsPage() {
     return {
       count: list.length,
       spent: list.reduce((s, r) => s + (r.total_price ?? 0), 0),
-      review: list.filter(needsReview).length,
     };
   }, [receipts]);
 
@@ -63,10 +62,9 @@ export default function ReceiptsPage() {
       </div>
 
       {receipts && receipts.length > 0 && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Stat label="Receipts" value={String(stats.count)} />
           <Stat label="Total spent" value={formatMoney(stats.spent)} />
-          <Stat label="Needs review" value={String(stats.review)} warn={stats.review > 0} />
         </div>
       )}
 
@@ -148,11 +146,7 @@ export default function ReceiptsPage() {
                     <td className="px-4 py-3 text-right tabular-nums text-slate-600">{r.item_count ?? "—"}</td>
                     <td className="px-4 py-3 text-right font-medium tabular-nums">{formatMoney(r.total_price)}</td>
                     <td className="px-4 py-3">
-                      {needsReview(r) ? (
-                        <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">Needs review</span>
-                      ) : (
-                        <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">Extracted</span>
-                      )}
+                      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">Extracted</span>
                     </td>
                     <td className="pr-4 text-slate-300">
                       <ChevronRight size={18} />
@@ -187,11 +181,11 @@ function ExtractButton({ extracting, onClick }: { extracting: boolean; onClick: 
   );
 }
 
-function Stat({ label, value, warn }: { label: string; value: string; warn?: boolean }) {
+function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="card px-5 py-4">
       <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
-      <p className={`mt-1 text-2xl font-semibold tabular-nums ${warn ? "text-amber-600" : ""}`}>{value}</p>
+      <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
     </div>
   );
 }
