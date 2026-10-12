@@ -200,4 +200,5 @@ def ask():
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    # No reloader: it restarts on unrelated file changes
+    app.run(debug=True, use_reloader=False)
