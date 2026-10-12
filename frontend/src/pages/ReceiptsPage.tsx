@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { AlertTriangle, ChevronRight, Plus, RefreshCw, ScanLine, Search } from "lucide-react";
+import { AlertTriangle, ChevronRight, Loader2, Plus, RefreshCw, ScanLine, Search } from "lucide-react";
 import { api, errorMessage } from "../api";
 import { formatDate, formatMoney, needsReview } from "../lib/format";
+import { isExtracting, useExtractStore } from "../lib/extractStore";
 import type { Receipt } from "../types";
 import UploadModal from "../components/UploadModal";
 
@@ -13,7 +14,11 @@ export default function ReceiptsPage() {
   const [reloadKey, setReloadKey] = useState(0);
   const [query, setQuery] = useState("");
   const [showUpload, setShowUpload] = useState(false);
+  const extractState = useExtractStore();
+  const extracting = isExtracting(extractState);
+  const extractingFile = extracting ? extractState.job?.fileName : null;
 
+  // Also reloads when a background extraction finishes, so the new receipt shows up.
   useEffect(() => {
     let cancelled = false;
     api
@@ -23,7 +28,7 @@ export default function ReceiptsPage() {
     return () => {
       cancelled = true;
     };
-  }, [reloadKey]);
+  }, [reloadKey, extractState.completed]);
 
   const reload = () => {
     setReceipts(null);
@@ -54,9 +59,7 @@ export default function ReceiptsPage() {
             Upload a receipt, then review and correct what the model extracted.
           </p>
         </div>
-        <button className="btn-primary" onClick={() => setShowUpload(true)}>
-          <Plus size={18} /> Extract receipt
-        </button>
+        <ExtractButton extracting={extracting} onClick={() => setShowUpload(true)} />
       </div>
 
       {receipts && receipts.length > 0 && (
@@ -95,14 +98,12 @@ export default function ReceiptsPage() {
               <div key={i} className="h-10 animate-pulse rounded bg-slate-100" />
             ))}
           </div>
-        ) : receipts.length === 0 ? (
+        ) : receipts.length === 0 && !extracting ? (
           <div className="flex flex-col items-center gap-3 px-4 py-16 text-center">
             <ScanLine size={36} className="text-slate-300" />
             <p className="font-medium">No receipts yet</p>
             <p className="text-sm text-slate-500">Extract your first receipt to see it here.</p>
-            <button className="btn-primary" onClick={() => setShowUpload(true)}>
-              <Plus size={18} /> Extract receipt
-            </button>
+            <ExtractButton extracting={extracting} onClick={() => setShowUpload(true)} />
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -118,6 +119,17 @@ export default function ReceiptsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
+                {extractingFile && (
+                  <tr className="bg-brand-50/50">
+                    <td colSpan={6} className="px-4 py-3">
+                      <span className="flex items-center gap-2 text-brand-900">
+                        <Loader2 size={16} className="shrink-0 animate-spin" />
+                        <span className="truncate font-medium">{extractingFile}</span>
+                        <span className="shrink-0 text-slate-500">· Extracting… this can take a few minutes</span>
+                      </span>
+                    </td>
+                  </tr>
+                )}
                 {visible.map((r) => (
                   <tr
                     key={r.id}
@@ -147,7 +159,7 @@ export default function ReceiptsPage() {
                     </td>
                   </tr>
                 ))}
-                {visible.length === 0 && (
+                {visible.length === 0 && receipts.length > 0 && (
                   <tr>
                     <td colSpan={6} className="px-4 py-10 text-center text-slate-500">
                       No receipts match “{query}”.
@@ -162,6 +174,16 @@ export default function ReceiptsPage() {
 
       {showUpload && <UploadModal onClose={() => setShowUpload(false)} />}
     </div>
+  );
+}
+
+/** Locked while a receipt is being extracted: one at a time. */
+function ExtractButton({ extracting, onClick }: { extracting: boolean; onClick: () => void }) {
+  return (
+    <button className="btn-primary" onClick={onClick} disabled={extracting}>
+      {extracting ? <Loader2 size={18} className="animate-spin" /> : <Plus size={18} />}
+      {extracting ? "Extracting…" : "Extract receipt"}
+    </button>
   );
 }
 

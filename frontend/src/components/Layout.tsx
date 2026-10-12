@@ -2,6 +2,8 @@ import { useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { Loader2, Menu, MessagesSquare, ReceiptText, ScanLine, X } from "lucide-react";
 import { useAskStore } from "../lib/askStore";
+import { isExtracting, useExtractStore } from "../lib/extractStore";
+import ExtractNotice from "./ExtractNotice";
 
 const NAV = [
   { to: "/receipts", label: "Extract", hint: "Receipts & review", icon: ScanLine },
@@ -14,6 +16,9 @@ export default function Layout() {
   const [openOn, setOpenOn] = useState<string | null>(null);
   const open = openOn === pathname;
   const askBusy = useAskStore().busy;
+  const extracting = isExtracting(useExtractStore());
+  // Which nav item shows a spinner: work still running behind that page.
+  const busy: Record<string, boolean> = { "/receipts": extracting, "/ask": askBusy };
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
@@ -58,16 +63,12 @@ export default function Layout() {
                 <span className="text-sm font-semibold">{label}</span>
                 <span className="text-xs text-slate-400">{hint}</span>
               </span>
-              {to === "/ask" && askBusy && (
-                <Loader2 size={16} className="ml-auto animate-spin text-brand-700" aria-label="Answer in progress" />
+              {busy[to] && (
+                <Loader2 size={16} className="ml-auto animate-spin text-brand-700" aria-label="In progress" />
               )}
             </NavLink>
           ))}
         </nav>
-
-        <div className="border-t border-slate-100 px-5 py-4 text-xs text-slate-400">
-          Local models via Ollama
-        </div>
       </aside>
 
       <div className="md:pl-60">
@@ -81,6 +82,8 @@ export default function Layout() {
           <Outlet />
         </main>
       </div>
+
+      <ExtractNotice />
     </div>
   );
 }

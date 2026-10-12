@@ -1,18 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { FileText, Loader2, UploadCloud, X } from "lucide-react";
-import { api, errorMessage } from "../api";
+import { FileText, UploadCloud, X } from "lucide-react";
+import { startExtraction } from "../lib/extractStore";
 
 // Must match ALLOWED_EXT in backend/api.py.
 const ACCEPTED = [".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff", ".pdf"];
 
 export default function UploadModal({ onClose }: { onClose: () => void }) {
-  const navigate = useNavigate();
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => () => {
@@ -21,11 +18,11 @@ export default function UploadModal({ onClose }: { onClose: () => void }) {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !busy) onClose();
+      if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [busy, onClose]);
+  }, [onClose]);
 
   function pick(f: File | undefined) {
     if (!f) return;
@@ -39,19 +36,12 @@ export default function UploadModal({ onClose }: { onClose: () => void }) {
     setPreview(f.type.startsWith("image/") ? URL.createObjectURL(f) : null);
   }
 
-  async function extract() {
+  function extract() {
     if (!file) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await api.upload(file);
-      // The detail page shows this result (and the local image) right away,
-      // even before GET /receipts/:id is available.
-      navigate(`/receipts/${res.receipt_id}`, { state: { upload: res, file } });
-    } catch (e) {
-      setError(errorMessage(e));
-      setBusy(false);
-    }
+    // Runs in the background (extractStore): the user can keep using the app and
+    // gets a one-off popup (ExtractNotice) when it's done.
+    void startExtraction(file);
+    onClose();
   }
 
   return (
@@ -59,7 +49,7 @@ export default function UploadModal({ onClose }: { onClose: () => void }) {
       <div className="card w-full max-w-lg">
         <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
           <h2 className="font-semibold">Extract a receipt</h2>
-          <button onClick={onClose} disabled={busy} className="text-slate-400 hover:text-slate-600" aria-label="Close">
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600" aria-label="Close">
             <X size={20} />
           </button>
         </div>
@@ -68,8 +58,8 @@ export default function UploadModal({ onClose }: { onClose: () => void }) {
           <div
             role="button"
             tabIndex={0}
-            onClick={() => !busy && inputRef.current?.click()}
-            onKeyDown={(e) => e.key === "Enter" && !busy && inputRef.current?.click()}
+            onClick={() => inputRef.current?.click()}
+            onKeyDown={(e) => e.key === "Enter" && inputRef.current?.click()}
             onDragOver={(e) => {
               e.preventDefault();
               setDragging(true);
@@ -78,7 +68,7 @@ export default function UploadModal({ onClose }: { onClose: () => void }) {
             onDrop={(e) => {
               e.preventDefault();
               setDragging(false);
-              if (!busy) pick(e.dataTransfer.files[0]);
+              pick(e.dataTransfer.files[0]);
             }}
             className={`flex min-h-48 cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-4 text-center transition-colors ${
               dragging ? "border-brand-600 bg-brand-50" : "border-slate-300 hover:border-brand-600"
@@ -107,21 +97,20 @@ export default function UploadModal({ onClose }: { onClose: () => void }) {
             onChange={(e) => pick(e.target.files?.[0])}
           />
 
-          {busy && (
-            <p className="flex items-center gap-2 rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-900">
-              <Loader2 size={16} className="animate-spin" />
-              Reading the receipt… this can take a few minutes on CPU.
+          {file && !error && (
+            <p className="text-xs text-slate-500">
+              Extraction runs in the background and can take a few minutes. You can keep using the app;
+              a message pops up when it's done.
             </p>
           )}
           {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
         </div>
 
         <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-4">
-          <button className="btn-secondary" onClick={onClose} disabled={busy}>
+          <button className="btn-secondary" onClick={onClose}>
             Cancel
           </button>
-          <button className="btn-primary" onClick={extract} disabled={!file || busy}>
-            {busy && <Loader2 size={16} className="animate-spin" />}
+          <button className="btn-primary" onClick={extract} disabled={!file}>
             Extract
           </button>
         </div>
