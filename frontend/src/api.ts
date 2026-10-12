@@ -56,7 +56,7 @@ export const api = {
     return Array.isArray(rows) ? rows.map(normalizeReceipt) : [];
   },
 
-  /** GET /receipts/:id -> receipt with items (raw_output / image_path optional). */
+  /** GET /receipts/:id -> receipt with items (image_path optional). */
   async getReceipt(id: string): Promise<Receipt> {
     return normalizeReceipt(await request<unknown>(`/receipts/${encodeURIComponent(id)}`));
   },

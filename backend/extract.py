@@ -1,6 +1,6 @@
 """extract.py -- POST-PROCESSING of the model output (pure functions, no Ollama/DB, easy to test).
 
-Flow: llm.run_llm() -> raw dict -> postprocess() -> (clean dict, warnings) -> database.save_receipt()
+Flow: llm.run_llm() -> raw dict -> postprocess() -> clean dict -> database.save_receipt()
 """
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from decimal import Decimal
 from typing import Any
 
 NUM_FIELDS = ("subtotal", "tax", "fee", "discount", "total_price")
-TOLERANCE = 1.0          # Rupiah difference still treated as a match when validating totals
+TOLERANCE = 1.0          # Rupiah difference still treated as a match (summary-row detection)
 
 
 # --------------------------------------------------------------- dates
@@ -161,39 +161,11 @@ def drop_summary_rows(items: list[dict], subtotal: float | None = None,
     return kept
 
 
-# --------------------------------------------------------------- validation
-def validate_totals(data: dict) -> list[str]:
-    """Check that the numbers add up. Only produces warnings, never changes the data."""
-    warnings: list[str] = []
-    items = data.get("items") or []
-    sub, tax, fee, disc, total = (data.get(k) for k in NUM_FIELDS)
-
-    line_totals = [it.get("line_total") for it in items]
-    items_sum = sum(x for x in line_totals if x is not None)
-    if items and None in line_totals:
-        warnings.append(f"{line_totals.count(None)} item(s) without line_total")
-    elif items and sub is not None and abs(items_sum - sub) > TOLERANCE:
-        warnings.append(f"sum of line_total ({items_sum:,.0f}) != subtotal ({sub:,.0f})")
-
-    if total is None:
-        warnings.append("total_price is empty (needs review)")
-    else:
-        base = sub if sub is not None else (items_sum if items else None)
-        if base is not None:
-            expected = base + (tax or 0) + (fee or 0) - (disc or 0)
-            if abs(expected - total) > TOLERANCE:
-                warnings.append(f"subtotal + tax + fee - discount ({expected:,.0f}) != total_price ({total:,.0f})")
-    if not items:
-        warnings.append("no food items were read")
-    return warnings
-
-
 # --------------------------------------------------------------- pipeline
-def postprocess(raw: dict) -> tuple[dict, list[str]]:
-    """Raw dict from llm.run_llm() -> (clean dict ready for database.save_receipt, warnings).
+def postprocess(raw: dict) -> dict:
+    """Raw dict from llm.run_llm() -> clean dict ready for database.save_receipt.
     The input is not modified (it is copied) so the raw output can still be stored in raw_output."""
     data = copy.deepcopy(raw)
-    warnings: list[str] = []
 
     # restaurant
     name = data.get("restaurant")
@@ -201,23 +173,15 @@ def postprocess(raw: dict) -> tuple[dict, list[str]]:
 
     # time: use purchased_time; if empty, the model may have put the time inside purchased_at
     time_in_date, date_without_time = split_time(data.get("purchased_at"))
-    time_raw = data.get("purchased_time")
-    time_value, _ = split_time(time_raw)
-    if time_value is None and isinstance(time_raw, str) and time_raw.strip():
-        warnings.append(f"purchased_time '{time_raw}' could not be read -> NULL")
+    time_value, _ = split_time(data.get("purchased_time"))
     if time_value is None and time_in_date is not None:
-        warnings.append(f"purchased_time taken from purchased_at -> '{time_in_date}'")
         time_value = time_in_date
     data["purchased_time"] = time_value
 
-    # date: DD/MM/YYYY, failure -> NULL (= needs review)
-    date_raw = data.get("purchased_at")
-    date_value = normalize_date(date_without_time if time_in_date is not None else date_raw)
-    if isinstance(date_value, str) and _DATE_OK_RE.fullmatch(date_value):
-        data["purchased_at"] = date_value
-    else:
-        warnings.append(f"purchased_at '{date_raw}' could not be normalized -> NULL (needs review)")
-        data["purchased_at"] = None
+    # date: DD/MM/YYYY, failure -> NULL
+    date_value = normalize_date(date_without_time if time_in_date is not None else data.get("purchased_at"))
+    data["purchased_at"] = (date_value if isinstance(date_value, str) and _DATE_OK_RE.fullmatch(date_value)
+                            else None)
 
     # header numbers
     for k in NUM_FIELDS:
@@ -235,11 +199,5 @@ def postprocess(raw: dict) -> tuple[dict, list[str]]:
             "food_name": strip_qty(str(it.get("food_name") or "")),
             "line_total": _as_float(it.get("line_total")),
         })
-    before = len(items)
-    items = drop_summary_rows(items, data["subtotal"], data["total_price"])
-    if before - len(items):
-        warnings.append(f"{before - len(items)} summary/empty row(s) removed from items")
-    data["items"] = items
-
-    warnings += validate_totals(data)
-    return data, warnings
+    data["items"] = drop_summary_rows(items, data["subtotal"], data["total_price"])
+    return data

@@ -21,15 +21,15 @@ app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024     # 10 MB
 app.json.ensure_ascii = False
 
 
-def _embed_items(items: list[dict], warnings: list[str]) -> list[list[float]] | None:
-    """Embed food names. On failure (e.g. model not pulled) -> None + warning;
+def _embed_items(items: list[dict]) -> list[list[float]] | None:
+    """Embed food names. On failure (e.g. model not pulled) -> None, logged to the terminal;
     the receipt is still saved, with NULL embeddings."""
     if not items:
         return None
     try:
         return llm.embed_texts([it["food_name"] for it in items], kind="document")
     except Exception as e:  # noqa: BLE001
-        warnings.append(f"embedding failed ({type(e).__name__}: {e}); items saved without embeddings")
+        app.logger.warning("embedding failed (%s: %s); items saved without embeddings", type(e).__name__, e)
         return None
 
 
@@ -47,11 +47,9 @@ def upload():
     f.save(path)
     try:
         result = llm.run_llm(path)
-        data, warnings = extract.postprocess(result.data)
-        warnings = result.warnings + warnings
-        embeddings = _embed_items(data["items"], warnings)
-        raw_output = {"raw_text": result.raw_text, "parsed": result.data,
-                      "meta": result.meta, "warnings": warnings}
+        data = extract.postprocess(result.data)
+        embeddings = _embed_items(data["items"])
+        raw_output = {"raw_text": result.raw_text, "parsed": result.data}   # what the model read, as-is
         receipt_id = database.save_receipt(data, image_path=str(path), raw_output=raw_output,
                                            embeddings=embeddings)
     except llm.LLMError as e:                          # model gave no usable JSON -> file is discarded
@@ -60,8 +58,7 @@ def upload():
     except Exception as e:  # noqa: BLE001
         path.unlink(missing_ok=True)
         return jsonify(error=f"{type(e).__name__}: {e}"), 500
-    return jsonify(filename=f.filename, receipt_id=str(receipt_id), data=data,
-                   warnings=warnings, meta=result.meta), 201
+    return jsonify(filename=f.filename, receipt_id=str(receipt_id), data=data), 201
 
 
 # --------------------------------------------------------------- receipts (review UI)
@@ -171,16 +168,12 @@ def receipts_update(receipt_id: str):
     if error:
         return jsonify(error=error), 400
 
-    warnings: list[str] = []
-    embeddings = _embed_items(data["items"], warnings)   # names may have changed -> re-embed
+    embeddings = _embed_items(data["items"])   # names may have changed -> re-embed
     try:
         database.update_receipt(receipt_id, data, embeddings=embeddings)
     except Exception as e:  # noqa: BLE001
         return jsonify(error=f"{type(e).__name__}: {e}"), 500
-    receipt = _jsonable(database.get_receipt_ui(receipt_id))
-    if warnings:                                           # e.g. embedding failed
-        receipt["warnings"] = warnings
-    return jsonify(receipt)
+    return jsonify(_jsonable(database.get_receipt_ui(receipt_id)))
 
 
 @app.route("/ask", methods=["POST"])
@@ -191,16 +184,9 @@ def ask():
         return jsonify(error="field 'question' is required (form or JSON)"), 400
 
     tool_calls: list[dict] = []
-
-    def log_round(t: dict) -> None:            # timings go to the terminal only, not the UI
-        app.logger.warning("/ask round %(round)s: load %(load_s)ss | read %(prompt_tokens)s tok "
-                           "in %(prompt_s)ss | wrote %(output_tokens)s tok in %(output_s)ss | "
-                           "tools %(tools_s)ss", t)
-
     try:
-        answer = tools.ask(question,
-                           on_tool=lambda name, args, _res: tool_calls.append({"tool": name, "args": args}),
-                           on_round=log_round)
+        answer = tools.ask(question, on_tool=lambda name, args, _res: tool_calls.append(
+            {"tool": name, "args": args}))
     except Exception as e:  # noqa: BLE001
         return jsonify(error=f"{type(e).__name__}: {e}", tool_calls=tool_calls), 500
     return jsonify(question=question, answer=answer, tool_calls=tool_calls)

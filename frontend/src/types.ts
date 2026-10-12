@@ -21,22 +21,12 @@ export interface ReceiptInput extends ReceiptFields {
   items: ReceiptItem[];
 }
 
-/** `raw_output` column: what the vision model produced before post-processing. */
-export interface RawOutput {
-  raw_text?: string;
-  parsed?: unknown;
-  meta?: Record<string, unknown>;
-  warnings?: string[];
-}
-
 /** A receipt as the UI uses it; optional fields depend on what the endpoint returns. */
 export interface Receipt extends ReceiptInput {
   id: string;
   item_count: number | null;
   created_at: string | null;
   image_path: string | null;
-  meta: Record<string, unknown> | null;
-  raw_output: RawOutput | null;
 }
 
 /** Response of POST /upload. `data` dates are "DD/MM/YYYY" (extract.postprocess). */
@@ -44,8 +34,6 @@ export interface UploadResponse {
   filename: string;
   receipt_id: string;
   data: ReceiptInput;
-  warnings: string[];
-  meta: Record<string, unknown>;
 }
 
 export interface ToolCall {

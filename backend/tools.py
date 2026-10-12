@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import datetime
 import json
-import time
 from typing import Any, Callable
 
 import ollama
@@ -142,17 +141,12 @@ def _date_ranges(today: datetime.date) -> str:
 
 
 def _compact(value: Any) -> Any:
-    """Drop null fields: tool results are fed back into the prompt, and on CPU every
-    token the model has to read costs time."""
+    """Drop null fields: tool results are fed back into the prompt, so shorter is faster on CPU."""
     if isinstance(value, dict):
         return {k: _compact(v) for k, v in value.items() if v is not None}
     if isinstance(value, list):
         return [_compact(v) for v in value]
     return value
-
-
-def _seconds(ns: int | None) -> float:
-    return round((ns or 0) / 1e9, 2)
 
 
 def _run_tool(name: str, args: dict) -> Any:
@@ -165,41 +159,27 @@ def _run_tool(name: str, args: dict) -> Any:
         return {"error": f"{type(e).__name__}: {e}"}
 
 
-def ask(question: str, on_tool: Callable[[str, dict, Any], None] | None = None,
-        on_round: Callable[[dict], None] | None = None) -> str:
-    """Question -> answer. on_tool(name, args, result) is called for every tool run;
-    on_round(timings) once per model call, to see where the time goes."""
+def ask(question: str, on_tool: Callable[[str, dict, Any], None] | None = None) -> str:
+    """Question -> answer. on_tool(name, args, result) is called for every tool run."""
     messages: list[Any] = [
         {"role": "system", "content": SYSTEM.format(date_ranges=_date_ranges(datetime.date.today()))},
         {"role": "user", "content": question},
     ]
-    for step in range(1, MAX_STEPS + 1):
+    for _ in range(MAX_STEPS):
         resp = ollama.chat(model=AGENT_MODEL, messages=messages, tools=TOOLS, think=False,
                            options={"temperature": 0, "num_ctx": AGENT_N_CTX})
         msg = resp.message
         messages.append(msg)
-        timings = {"round": step,
-                   "load_s": _seconds(resp.load_duration),           # > 0 = model was (re)loaded
-                   "prompt_tokens": resp.prompt_eval_count,          # tokens actually (re)read
-                   "prompt_s": _seconds(resp.prompt_eval_duration),
-                   "output_tokens": resp.eval_count,
-                   "output_s": _seconds(resp.eval_duration),
-                   "tools_s": 0.0}
-
-        if msg.tool_calls:
-            t0 = time.perf_counter()
-            for call in msg.tool_calls:
-                name = call.function.name
-                args = dict(call.function.arguments or {})
-                result = _run_tool(name, args)
-                if on_tool:
-                    on_tool(name, args, result)
-                messages.append({"role": "tool", "tool_name": name,
-                                 "content": json.dumps(_compact(result), default=str,
-                                                       ensure_ascii=False, separators=(",", ":"))})
-            timings["tools_s"] = round(time.perf_counter() - t0, 2)
-        if on_round:
-            on_round(timings)
         if not msg.tool_calls:                      # the model has answered
             return (msg.content or "").strip()
+
+        for call in msg.tool_calls:
+            name = call.function.name
+            args = dict(call.function.arguments or {})
+            result = _run_tool(name, args)
+            if on_tool:
+                on_tool(name, args, result)
+            messages.append({"role": "tool", "tool_name": name,
+                             "content": json.dumps(_compact(result), default=str,
+                                                   ensure_ascii=False, separators=(",", ":"))})
     raise RuntimeError(f"agent did not answer within {MAX_STEPS} tool-call rounds")

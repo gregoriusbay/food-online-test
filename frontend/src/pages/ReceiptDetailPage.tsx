@@ -107,8 +107,7 @@ function ReceiptDetail({ id }: { id: string }) {
       .getReceipt(id)
       .then((r) => {
         if (cancelled) return;
-        // Keep meta from the upload response when GET doesn't return it.
-        setReceipt((prev) => ({ ...r, meta: r.meta ?? prev?.meta ?? null }));
+        setReceipt(r);
         setForm((prev) => (prev && touched.current ? prev : toForm(r)));
       })
       .catch((e) => !cancelled && setLoadError(e))
@@ -145,7 +144,7 @@ function ReceiptDetail({ id }: { id: string }) {
     try {
       const saved = await api.updateReceipt(id, draft);
       const next: Receipt = saved
-        ? { ...receipt, ...saved, meta: saved.meta ?? receipt.meta, raw_output: saved.raw_output ?? receipt.raw_output }
+        ? { ...receipt, ...saved }
         : { ...receipt, ...draft, item_count: draft.items.length };
       setReceipt(next);
       setForm(toForm(next));
@@ -230,7 +229,7 @@ function ReceiptDetail({ id }: { id: string }) {
             {tab === "fields" ? (
               <FieldsForm form={form} draft={draft} edit={edit} editItem={editItem} />
             ) : (
-              <JsonTab receipt={receipt} draft={draft} id={id} />
+              <JsonTab draft={draft} id={id} />
             )}
           </div>
         </section>
@@ -342,13 +341,9 @@ function FieldsForm({ form, draft, edit, editItem }: FieldsFormProps) {
   );
 }
 
-function JsonTab({ receipt, draft, id }: { receipt: Receipt; draft: ReceiptInput; id: string }) {
-  const [view, setView] = useState<"result" | "raw">("result");
+function JsonTab({ draft, id }: { draft: ReceiptInput; id: string }) {
   const [copied, setCopied] = useState(false);
-
-  const result = { receipt_id: id, ...toApiInput(draft), meta: receipt.meta };
-  const value = view === "result" ? result : receipt.raw_output;
-  const text = value == null ? "" : JSON.stringify(value, null, 2);
+  const text = JSON.stringify({ receipt_id: id, ...toApiInput(draft) }, null, 2);
 
   async function copy() {
     try {
@@ -364,39 +359,22 @@ function JsonTab({ receipt, draft, id }: { receipt: Receipt; draft: ReceiptInput
     const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
     const a = document.createElement("a");
     a.href = url;
-    a.download = `receipt-${id.slice(0, 8)}${view === "raw" ? "-raw" : ""}.json`;
+    a.download = `receipt-${id.slice(0, 8)}.json`;
     a.click();
     URL.revokeObjectURL(url);
   }
 
   return (
     <div className="flex h-full flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="inline-flex rounded-lg bg-slate-100 p-0.5 text-sm">
-          {(["result", "raw"] as const).map((v) => (
-            <button
-              key={v}
-              onClick={() => setView(v)}
-              className={`rounded-md px-3 py-1 ${view === v ? "bg-white font-medium shadow-sm" : "text-slate-500"}`}
-            >
-              {v === "result" ? "Result" : "Raw model output"}
-            </button>
-          ))}
-        </div>
-        <button className="btn-secondary ml-auto px-3 py-1.5" onClick={copy} disabled={!text}>
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <button className="btn-secondary px-3 py-1.5" onClick={copy}>
           {copied ? <Check size={16} /> : <Copy size={16} />} {copied ? "Copied" : "Copy"}
         </button>
-        <button className="btn-secondary px-3 py-1.5" onClick={download} disabled={!text}>
+        <button className="btn-secondary px-3 py-1.5" onClick={download}>
           <Download size={16} /> Download
         </button>
       </div>
-      {text ? (
-        <pre className="flex-1 overflow-auto rounded-lg bg-slate-900 p-4 text-xs leading-relaxed text-slate-100">{text}</pre>
-      ) : (
-        <p className="rounded-lg bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
-          Raw output isn't available. Return <code>raw_output</code> from GET /receipts/:id to show it here.
-        </p>
-      )}
+      <pre className="flex-1 overflow-auto rounded-lg bg-slate-900 p-4 text-xs leading-relaxed text-slate-100">{text}</pre>
     </div>
   );
 }

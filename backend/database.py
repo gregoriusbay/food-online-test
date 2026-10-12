@@ -239,10 +239,10 @@ def list_receipts_ui(limit: int = 500) -> list[dict]:
 
 
 def get_receipt_ui(receipt_id: str) -> dict | None:
-    """One receipt with its items, image path and raw model output."""
+    """One receipt with its items and image path."""
     with get_conn() as conn, conn.cursor(row_factory=dict_row) as cur:
         cur.execute("""SELECT id, restaurant, purchased_at, purchased_time, subtotal, tax, fee,
-                              discount, total_price, created_at, image_path, raw_output
+                              discount, total_price, created_at, image_path
                        FROM receipts WHERE id = %s""", (receipt_id,))
         receipt = cur.fetchone()
         if receipt is None:

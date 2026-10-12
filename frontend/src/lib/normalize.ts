@@ -1,4 +1,4 @@
-import type { RawOutput, Receipt, ReceiptInput, ReceiptItem, UploadResponse } from "../types";
+import type { Receipt, ReceiptInput, ReceiptItem, UploadResponse } from "../types";
 
 // The API uses "DD/MM/YYYY" dates; Flask may also send numeric as "45000.00".
 // Inside the UI everything is normalised to numbers, "YYYY-MM-DD" (what
@@ -58,8 +58,6 @@ function toItems(v: unknown): ReceiptItem[] {
 
 export function normalizeReceipt(v: unknown): Receipt {
   const o = isObj(v) ? v : {};
-  const raw = isObj(o.raw_output) ? (o.raw_output as RawOutput) : null;
-  const meta = isObj(o.meta) ? o.meta : raw && isObj(raw.meta) ? raw.meta : null;
   return {
     id: String(o.id ?? o.receipt_id ?? ""),
     restaurant: toStr(o.restaurant),
@@ -74,15 +72,9 @@ export function normalizeReceipt(v: unknown): Receipt {
     item_count: toNum(o.item_count) ?? (Array.isArray(o.items) ? o.items.length : null),
     created_at: toStr(o.created_at),
     image_path: toStr(o.image_path),
-    meta,
-    raw_output: raw,
   };
 }
 
 export function receiptFromUpload(res: UploadResponse): Receipt {
-  return normalizeReceipt({
-    ...res.data,
-    id: res.receipt_id,
-    meta: res.meta,
-  });
+  return normalizeReceipt({ ...res.data, id: res.receipt_id });
 }

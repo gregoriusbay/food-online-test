@@ -2,12 +2,9 @@
 (extraction + embeddings). Knows nothing about post-processing or the database."""
 from __future__ import annotations
 
-import datetime
-import hashlib
 import json
 import re
-import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
@@ -208,8 +205,6 @@ class LLMError(RuntimeError):
 class LLMResult:
     data: dict
     raw_text: str
-    meta: dict
-    warnings: list[str] = field(default_factory=list)
 
 
 # --------------------------------------------------------------- functions
@@ -274,8 +269,6 @@ def run_llm(path: Path, *, model: str = MODEL, dpi: int = DPI, max_dim: int = MA
 
     parts: list[str] = []
     think_parts: list[str] = []
-    final = None
-    t0 = time.time()
     for chunk in ollama.chat(
         model=model,
         messages=[
@@ -295,39 +288,10 @@ def run_llm(path: Path, *, model: str = MODEL, dpi: int = DPI, max_dim: int = MA
         tpiece = getattr(chunk.message, "thinking", None)
         if tpiece:
             think_parts.append(tpiece)
-        if chunk.done:
-            final = chunk
-    dur = time.time() - t0
-
-    prompt_tok = getattr(final, "prompt_eval_count", None)
-    output_tok = getattr(final, "eval_count", None)
-    done_reason = getattr(final, "done_reason", None)
-
-    warnings: list[str] = []
-    if done_reason == "length":
-        warnings.append(f"output hit the num_predict limit ({num_predict}); JSON may be truncated")
-    if prompt_tok and prompt_tok >= n_ctx - 64:
-        warnings.append(f"prompt ({prompt_tok} tokens) is close to n_ctx ({n_ctx}); context may be truncated")
 
     raw = "".join(parts).strip()
-    from_thinking = False
     if not raw:                       # qwen3-vl template bug: the answer lands in the thinking channel
         raw = "".join(think_parts).strip()
-        from_thinking = bool(raw)
-
-    meta = {
-        "model": model,
-        "run_at": datetime.datetime.now().isoformat(timespec="seconds"),
-        "duration_s": round(dur, 1),
-        "tok_per_s": round(output_tok / dur, 1) if output_tok and dur else None,
-        "prompt_tok": prompt_tok,
-        "output_tok": output_tok,
-        "done_reason": done_reason,
-        "num_gpu": num_gpu,
-        "pages": len(images),
-        "img_sha": [hashlib.sha1(b).hexdigest()[:10] for b in images],
-        "json_from_thinking": from_thinking,
-    }
 
     if not raw:
         raise LLMError("model returned empty text (try think=True, use_schema=False, or another model)")
@@ -337,4 +301,4 @@ def run_llm(path: Path, *, model: str = MODEL, dpi: int = DPI, max_dim: int = MA
         raise LLMError("model did not return valid JSON", raw=raw) from e
     if not isinstance(data, dict):
         raise LLMError("JSON output is not an object", raw=raw)
-    return LLMResult(data=data, raw_text=raw, meta=meta, warnings=warnings)
+    return LLMResult(data=data, raw_text=raw)
