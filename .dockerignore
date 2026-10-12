@@ -2,4 +2,4 @@
 # (The frontend has its own context and .dockerignore in frontend/.)
 *
 !backend/*.py
-!backend/requirements.txt
+!requirements.txt

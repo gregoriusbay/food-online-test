@@ -15,7 +15,7 @@ WORKDIR /app
 RUN useradd -m -u 1000 appuser && mkdir -p /app/uploads && chown appuser:appuser /app/uploads
 
 # Dependencies first so this layer is cached between code changes
-COPY backend/requirements.txt .
+COPY requirements.txt .
 RUN pip install -r requirements.txt
 
 # Code stays owned by root (read-only for appuser); only /app/uploads is writable

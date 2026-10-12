@@ -1,0 +1,6 @@
+# The image runs `npm install` itself; host node_modules (Windows binaries) must not overwrite it.
+node_modules
+dist
+.env
+.env.*
+!.env.example

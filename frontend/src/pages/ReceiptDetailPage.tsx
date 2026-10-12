@@ -13,7 +13,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { api, errorMessage } from "../api";
-import { formatDate, formatMoney } from "../lib/format";
+import { formatDate } from "../lib/format";
 import { receiptFromUpload, toApiInput } from "../lib/normalize";
 import type { Receipt, ReceiptFields, ReceiptInput, UploadResponse } from "../types";
 import ImageViewer from "../components/ImageViewer";
@@ -271,7 +271,6 @@ interface FieldsFormProps {
 }
 
 function FieldsForm({ form, draft, warnings, edit, editItem }: FieldsFormProps) {
-  const checks = consistencyChecks(draft);
   return (
     <div className="space-y-6">
       {warnings.length > 0 && (
@@ -368,44 +367,8 @@ function FieldsForm({ form, draft, warnings, edit, editItem }: FieldsFormProps) 
           </div>
         ))}
       </div>
-
-      {checks.length > 0 && (
-        <ul className="space-y-1 rounded-lg border border-slate-200 p-3 text-sm">
-          {checks.map((c) => (
-            <li key={c.label} className={`flex items-start gap-2 ${c.ok ? "text-emerald-700" : "text-amber-700"}`}>
-              {c.ok ? <Check size={16} className="mt-0.5 shrink-0" /> : <AlertTriangle size={16} className="mt-0.5 shrink-0" />}
-              <span>
-                {c.label}
-                {!c.ok && <span className="text-slate-500"> ({c.detail})</span>}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
     </div>
   );
-}
-
-/** Arithmetic sanity checks that point the reviewer at likely misreads. */
-function consistencyChecks(d: ReceiptInput) {
-  const checks: { label: string; ok: boolean; detail: string }[] = [];
-  const itemsSum = d.items.reduce((s, it) => s + (it.line_total ?? 0), 0);
-  if (d.subtotal != null && d.items.length > 0) {
-    checks.push({
-      label: "Items add up to the subtotal",
-      ok: Math.abs(itemsSum - d.subtotal) < 1,
-      detail: `items ${formatMoney(itemsSum)} vs subtotal ${formatMoney(d.subtotal)}`,
-    });
-  }
-  if (d.subtotal != null && d.total_price != null) {
-    const expected = d.subtotal + (d.tax ?? 0) + (d.fee ?? 0) - (d.discount ?? 0);
-    checks.push({
-      label: "Subtotal + tax + fees − discount = total",
-      ok: Math.abs(expected - d.total_price) < 1,
-      detail: `expected ${formatMoney(expected)}, total is ${formatMoney(d.total_price)}`,
-    });
-  }
-  return checks;
 }
 
 function JsonTab({ receipt, draft, id }: { receipt: Receipt; draft: ReceiptInput; id: string }) {
