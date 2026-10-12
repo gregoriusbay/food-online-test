@@ -39,7 +39,7 @@ export default function UploadModal({ onClose }: { onClose: () => void }) {
   function extract() {
     if (!file) return;
     // Runs in the background (extractStore): the user can keep using the app and
-    // gets a one-off popup (ExtractNotice) when it's done.
+    // the receipts table reloads when it's done.
     void startExtraction(file);
     onClose();
   }
@@ -100,7 +100,7 @@ export default function UploadModal({ onClose }: { onClose: () => void }) {
           {file && !error && (
             <p className="text-xs text-slate-500">
               Extraction runs in the background and can take a few minutes. You can keep using the app;
-              a message pops up when it's done.
+              the receipt appears in the table when it's done.
             </p>
           )}
           {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}

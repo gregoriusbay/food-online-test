@@ -18,7 +18,7 @@ services:
       - db-data:/var/lib/postgresql/data
       - ./data/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro   # runs on first start only
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d receipts"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -30,7 +30,7 @@ services:
       DB_PORT: 5432
       DB_USERNAME: postgres
       DB_PASSWORD: ${DB_PASSWORD:-secret}
-      DB_NAME: receipts
+      DB_NAME: ${DB_NAME:-postgres}         # same database as local runs (.env)
       OLLAMA_HOST: ${OLLAMA_HOST:-http://host.docker.internal:11434}
     extra_hosts:
       - "host.docker.internal:host-gateway"   # needed on Linux; Docker Desktop has it already

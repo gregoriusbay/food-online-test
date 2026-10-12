@@ -1,15 +1,13 @@
 import { useSyncExternalStore } from "react";
 import { api, errorMessage } from "../api";
-import type { UploadResponse } from "../types";
 
 // The running extraction lives here, outside any page, so the user can navigate
 // while the model reads the receipt. One receipt at a time: the model runs on CPU
-// and a second upload would only queue behind the first. When it finishes, the
-// receipts table reloads and a one-off popup (ExtractNotice) appears on any page.
+// and a second upload would only queue behind the first. On success the receipts
+// table reloads; only a failure shows a popup (ExtractNotice).
 
 export type ExtractJob =
   | { status: "running"; fileName: string }
-  | { status: "done"; fileName: string; upload: UploadResponse; file: File }
   | { status: "error"; fileName: string; error: string };
 
 interface ExtractState {
@@ -43,17 +41,14 @@ export async function startExtraction(file: File) {
   if (isExtracting(state)) return;
   update({ job: { status: "running", fileName: file.name } });
   try {
-    const upload = await api.upload(file);
-    update({
-      job: { status: "done", fileName: file.name, upload, file },
-      completed: state.completed + 1,
-    });
+    await api.upload(file);
+    update({ job: null, completed: state.completed + 1 });
   } catch (e) {
     update({ job: { status: "error", fileName: file.name, error: errorMessage(e) } });
   }
 }
 
-/** Close the finished/failed popup. A running job can't be dismissed. */
+/** Close the failure popup. A running job can't be dismissed. */
 export function dismissExtraction() {
   if (!isExtracting(state)) update({ job: null });
 }
