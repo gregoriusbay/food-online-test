@@ -1,6 +1,5 @@
 import { useSyncExternalStore } from "react";
 import { api, errorMessage } from "../api";
-import type { ToolCall } from "../types";
 
 // The Ask conversation lives here, outside the page component, so a pending /ask
 // survives navigating to another page: its answer is stored when it arrives and
@@ -9,7 +8,6 @@ import type { ToolCall } from "../types";
 export interface Message {
   role: "user" | "assistant";
   text: string;
-  toolCalls?: ToolCall[];
   error?: boolean;
 }
 
@@ -60,7 +58,7 @@ export async function sendQuestion(question: string) {
   let reply: Message;
   try {
     const res = await api.ask(q);
-    reply = { role: "assistant", text: res.answer, toolCalls: res.tool_calls };
+    reply = { role: "assistant", text: res.answer };
   } catch (e) {
     reply = { role: "assistant", text: errorMessage(e), error: true };
   }

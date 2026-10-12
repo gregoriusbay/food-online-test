@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Loader2, MessagesSquare, Send, Trash2, Wrench } from "lucide-react";
+import { Loader2, MessagesSquare, Send, Trash2 } from "lucide-react";
 import { clearConversation, sendQuestion, useAskStore } from "../lib/askStore";
-import type { ToolCall } from "../types";
 
 const SUGGESTIONS = [
   "How much did I spend on food last month?",
@@ -67,7 +66,7 @@ export default function AskPage() {
                 </p>
               </div>
             ) : (
-              <div key={i} className="max-w-[85%] space-y-2">
+              <div key={i} className="max-w-[85%]">
                 <p
                   className={`whitespace-pre-wrap rounded-2xl rounded-bl-sm px-4 py-2 text-sm ${
                     m.error ? "bg-red-50 text-red-700" : "bg-slate-100 text-slate-800"
@@ -75,7 +74,6 @@ export default function AskPage() {
                 >
                   {m.text}
                 </p>
-                {m.toolCalls && m.toolCalls.length > 0 && <ToolCalls calls={m.toolCalls} />}
               </div>
             ),
           )}
@@ -114,23 +112,5 @@ export default function AskPage() {
         </form>
       </div>
     </div>
-  );
-}
-
-function ToolCalls({ calls }: { calls: ToolCall[] }) {
-  return (
-    <details className="text-xs text-slate-500">
-      <summary className="flex cursor-pointer items-center gap-1 hover:text-slate-700">
-        <Wrench size={12} /> Used {calls.length} tool{calls.length > 1 ? "s" : ""}
-      </summary>
-      <ul className="mt-2 space-y-1">
-        {calls.map((c, i) => (
-          <li key={i} className="rounded-md bg-slate-50 px-3 py-2">
-            <span className="font-mono font-medium text-slate-700">{c.tool}</span>
-            <pre className="mt-1 overflow-x-auto whitespace-pre-wrap break-all">{JSON.stringify(c.args)}</pre>
-          </li>
-        ))}
-      </ul>
-    </details>
   );
 }

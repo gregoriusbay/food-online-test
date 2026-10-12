@@ -1,0 +1,12 @@
+label,peak_mb,time_s,file
+read csv (time only),,0.5,100k
+read csv,54.8,1.16,100k
+data quality,13.7,0.7,100k
+duplicate emails,2.2,0.03,100k
+country,0.3,0.01,100k
+country (time only),,0.01,100k
+phone patterns,10.7,3.58,100k
+split phone,33.3,3.0,100k
+country code by country,14.4,1.25,100k
+subscription date,11.4,0.24,100k
+email & website,38.7,0.98,100k
