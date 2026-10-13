@@ -1,0 +1,5 @@
+# Build context = repo root. Exclude everything, then allow only what the backend image needs.
+# (The frontend has its own context and .dockerignore in frontend/.)
+*
+!backend/*.py
+!requirements.txt

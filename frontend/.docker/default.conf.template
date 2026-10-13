@@ -1,0 +1,77 @@
+server {
+    listen 80;
+
+    # Root directory for serving files
+    root /usr/share/nginx/html;
+
+    # Include MIME types
+    include /etc/nginx/mime.types;
+
+    # Default MIME type
+    default_type application/octet-stream;
+
+    # Applies to all locations below (including the /api/ proxy), so
+    # uploads forwarded to the backend aren't capped by nginx's 1M default.
+    client_max_body_size 50M;
+
+    # Proxy API requests to the backend so the browser sees a single origin.
+    # BACKEND_API_URL must be scheme://host[:port] with NO trailing slash and
+    # NO path. The trailing "/" in proxy_pass strips the /api prefix, because
+    # the Flask routes have none (/api/upload -> /upload).
+    location /api/ {
+        proxy_pass ${BACKEND_API_URL}/;
+        proxy_http_version 1.1;
+        # Extraction on CPU can take minutes (gunicorn --timeout 900).
+        proxy_read_timeout 900s;
+        proxy_send_timeout 900s;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Serve static files directly
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Handle JavaScript files with correct MIME types
+    location ~* \.(js|mjs)$ {
+        types {
+            application/javascript js mjs;
+        }
+        # Enable gzip compression for JavaScript files
+        gzip on;
+        gzip_types application/javascript;
+        gzip_min_length 1000;
+        gzip_comp_level 5;
+        gzip_proxied any;
+        gzip_vary on;
+
+        # Cache control for JavaScript files
+        add_header Cache-Control "public, max-age=31536000, immutable";
+    }
+
+    # Handle CSS files (including Tailwind CSS)
+    location ~* \.css$ {
+        # Enable gzip compression for CSS files
+        gzip on;
+        gzip_types text/css;
+        gzip_min_length 1000;
+        gzip_comp_level 5;
+        gzip_proxied any;
+        gzip_vary on;
+
+        # Cache control for CSS files
+        add_header Cache-Control "public, max-age=31536000, immutable";
+    }
+
+    # Security headers
+    add_header X-Content-Type-Options "nosniff";
+    add_header X-Frame-Options "SAMEORIGIN";
+    add_header X-XSS-Protection "1; mode=block";
+    add_header Referrer-Policy "no-referrer-when-downgrade";
+
+    # Disable server tokens for security
+    server_tokens off;
+}

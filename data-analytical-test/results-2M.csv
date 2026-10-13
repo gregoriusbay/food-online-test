@@ -1,0 +1,17 @@
+label,peak_mb,time_s,file
+read csv (time only),,11.27,2M
+read csv,1083.2,21.14,2M
+overview,88.7,129.0,2M
+read csv in chunks (time only),,10.03,2M
+read csv in chunks,50.9,23.06,2M
+country (time only),,3.36,2M
+data quality,69.9,97.25,2M
+duplicate emails,101.6,26.23,2M
+country,3.8,3.45,2M
+phone patterns,74.2,62.7,2M
+split phone,151.4,66.01,2M
+country code by country,78.4,19.28,2M
+subscription date,17.1,8.64,2M
+email & website,116.4,73.65,2M
+"read csv, category dtype (time only)",,10.93,2M
+"read csv, category dtype",1264.6,21.73,2M
