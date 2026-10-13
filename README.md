@@ -135,6 +135,33 @@ The UI is on **http://localhost:8080**. Nginx in the frontend container forwards
 
 The backend looks for Ollama at `http://host.docker.internal:11434`, you can change it with `OLLAMA_HOST`.
 
+### Try it
+
+In the UI (http://localhost:8080):
+
+1. **Extract** → **Extract receipt**, pick one of the sample receipts in `data/` (`struk_restoran_*`). The modal closes and an "Extracting…" row shows in the table. On CPU this takes a few minutes, you can go to another page meanwhile.
+2. When it's done the receipt shows up in the table. Click it: the image is on the left, the extracted fields and items on the right. Change something and press **Save**, reload the page to see it was stored.
+3. The **JSON** tab shows the same data as JSON, with Copy and Download.
+4. **Ask** → try the example questions from the test, e.g. "Where did i buy hamburger from last 7 day". Keep in mind the dates come from the receipts, so "yesterday" or "last 7 days" only finds something if a receipt has a date in that range.
+
+Or with curl, through the same nginx (`/api/...`):
+
+```bash
+curl -F "file=@data/struk_restoran_1.jpg" http://localhost:8080/api/upload
+curl http://localhost:8080/api/receipts
+curl -X POST http://localhost:8080/api/ask -H "Content-Type: application/json" \
+  -d '{"question": "Where did i buy hamburger from last 7 day"}'
+```
+
+To look at the tables directly (DBeaver, pgAdmin, psql): host `localhost`, port **5433**, database `postgres`, user `postgres`, password from `.env`. Port 5432 is a different Postgres if you also have one installed on your machine.
+
+### If something doesn't work
+
+- **An upload stays on "Extracting…" for a long time.** Check that Ollama is running on the host (`ollama list`) and that both models are pulled, then look at the backend log: `docker compose logs backend --tail 50`.
+- **"Extraction failed" popup.** The message comes from the backend. Most of the time the model didn't return usable JSON (a very blurry photo, or not a receipt); try another image.
+- **The table is empty after `docker compose down -v`.** That's expected, `-v` deletes the volumes, so all receipts and uploaded images are gone. `docker compose down` (without `-v`) keeps them.
+- **Ask is slow.** Every question needs at least two model calls (pick a tool, then write the answer). On CPU that's often a minute or more.
+
 ### Run without Docker (for development)
 
 ```bash
@@ -157,7 +184,7 @@ The backend reads the same root `.env` (`DB_HOST=localhost`, `DB_PORT=5433`, `DB
 
 Don't mix the two ways of running when you upload receipts: the backend stores the image path, so a receipt uploaded with `python api.py` (path on your disk) has no image in the Docker version, and the other way around.
 
-Try it with curl:
+In this mode the backend is on port 5000 directly (no `/api` prefix):
 
 ```bash
 curl -F "file=@data/struk_restoran_1.jpg" http://localhost:5000/upload
