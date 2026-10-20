@@ -1,7 +1,5 @@
 # ==============================================================================
 # Standards Compliance: ISO 27001:2022 (A.8.25, A.8.28, A.8.29)
-# Maintainers:  Taufiq Permana (taufiq.permana@idstar.co.id)
-# Latest Update: 2026-01-29
 # ==============================================================================
 
 stages:
@@ -16,8 +14,8 @@ stages:
 # ------------------------------------------------------------------------------
 variables:
   # Container Registry Configuration
-  DOCKER_REGISTRY: 560397894482.dkr.ecr.ap-southeast-3.amazonaws.com
-  IMAGE_NAME: kmm-frame-ai
+  # DOCKER_REGISTRY is set as a masked CI/CD variable in the project settings
+  IMAGE_NAME: food-online-test
 
   # Versioning Strategy (A.8.10 - Protection of Logs/Audit)
   IMAGE_TAG_STAGING: ${CI_COMMIT_SHORT_SHA}
@@ -25,7 +23,7 @@ variables:
 
   # Path Configurations
   DOCKERFILE_PATH: ./Dockerfile
-  INFISICAL_ENV_PATH: /kacamatamoo/frame/kmm-frame-ai
+  INFISICAL_ENV_PATH: /food-online-test
 
   # Performance Optimization (BuildKit & Caching)
   CACHE_DIR: "$CI_PROJECT_DIR/.cache"
